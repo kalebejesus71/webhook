@@ -1,6 +1,6 @@
 // webhook_server.js
 // Requisitos:
-// npm i express puppeteer-extra puppeteer-core puppeteer-extra-plugin-stealth node-fetch@2
+// npm i express puppeteer-extra puppeteer puppeteer-extra-plugin-stealth node-fetch@2
 
 const express = require('express');
 const puppeteer = require('puppeteer-extra');
@@ -16,33 +16,18 @@ const PORT = process.env.PORT || 3000;
 const TARGET = 'https://raspagreenio.rf.gd/callbackpayment/bullspay.php';
 const POST_URL = TARGET; // usa o mesmo link do seu código
 
-// caminhos prováveis do Chromium no Termux (ajuste se necessário)
-const CHROME_PATHS = [
-  '/data/data/com.termux/files/usr/bin/chromium-browser',
-  '/data/data/com.termux/files/usr/bin/headless_shell',
-  '/data/data/com.termux/files/usr/bin/chromium',
-  '/usr/bin/chromium',
-  '/usr/bin/chromium-browser'
-];
-
-function findExecutable() {
-  for (const p of CHROME_PATHS) {
-    try { if (fs.existsSync(p)) return p; } catch(e){}
-  }
-  return null;
-}
-
 let browserInstance = null;
 let busy = false; // bloqueio simples para não processar concorrência no celular (pode ajustar)
 
 // função que garante que exista browser rodando
 async function ensureBrowser() {
   if (browserInstance) return browserInstance;
-  const exe = findExecutable();
-  if (!exe) throw new Error('Chromium não encontrado. Ajuste CHROME_PATHS ou instale chromium no Termux.');
-  browserInstance = await puppeteer.launch({
+
+  // Se quiser forçar um executável customizado (por exemplo em ambientes onde já existe chromium),
+  // exporte PUPPETEER_EXECUTABLE_PATH no ambiente.
+  const exePath = process.env.PUPPETEER_EXECUTABLE_PATH || null;
+  const launchOptions = {
     headless: true,
-    executablePath: exe,
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
@@ -54,7 +39,16 @@ async function ensureBrowser() {
       '--disable-blink-features=AutomationControlled'
     ],
     defaultViewport: { width: 1200, height: 800 }
-  });
+  };
+
+  if (exePath) {
+    console.log('Usando executável de Chromium em (PUPPETEER_EXECUTABLE_PATH):', exePath);
+    launchOptions.executablePath = exePath;
+  } else {
+    console.log('Nenhum PUPPETEER_EXECUTABLE_PATH definido — puppeteer usará o Chromium baixado em node_modules.');
+  }
+
+  browserInstance = await puppeteer.launch(launchOptions);
   return browserInstance;
 }
 
@@ -113,7 +107,7 @@ app.post('/proxy-webhook', async (req, res) => {
     if (!cookieObj) {
       // salva debug html
       const html = await page.content().catch(()=>'<no-html>');
-      fs.writeFileSync('debug_page.html', html);
+      try { fs.writeFileSync('debug_page.html', html); } catch(e){ console.error('Falha ao salvar debug_page.html', e); }
       await page.close();
       busy = false;
       res.status(500).json({ error: '__test cookie not found', debug_file: 'debug_page.html' });

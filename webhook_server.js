@@ -383,6 +383,22 @@ async function shutdown() {
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
 
+// endpoint temporário para descobrir pastas Chromium
+app.get('/debug-chrome-path', (req, res) => {
+  const fs = require('fs');
+  const base = '/opt/render/.cache/puppeteer/chrome';
+  try {
+    const dirs = fs.readdirSync(base, { withFileTypes: true })
+      .filter(d => d.isDirectory())
+      .map(d => d.name);
+
+    const paths = dirs.map(d => `${base}/${d}/chrome`);
+    res.json({ found: dirs, executablePaths: paths });
+  } catch (err) {
+    res.status(500).json({ error: String(err), message: 'Não foi possível listar as pastas' });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Proxy webhook rodando na porta ${PORT}. CONCURRENCY=${CONCURRENCY} SYNC_RESPONSE=${SYNC_RESPONSE} ASYNC_RESPONSE=${ASYNC_RESPONSE}`);
 });

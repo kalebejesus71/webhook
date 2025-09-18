@@ -33,6 +33,24 @@ const ASYNC_RESPONSE = (process.env.ASYNC_RESPONSE || 'false').toLowerCase() ===
 const DEBUG_DUMP = (process.env.DEBUG_DUMP || 'false').toLowerCase() === 'true';
 const PUPPETEER_EXECUTABLE_PATH = process.env.PUPPETEER_EXECUTABLE_PATH || null;
 
+/* === Determine default chrome path installed by @puppeteer/browsers (if available) === */
+let BROWSERS_EXE_PATH = null;
+try {
+  // @puppeteer/browsers exports executablePath(...)
+  const browsersPkg = require('@puppeteer/browsers');
+  if (browsersPkg && typeof browsersPkg.executablePath === 'function') {
+    try {
+      BROWSERS_EXE_PATH = browsersPkg.executablePath('chrome');
+      // may throw if not installed; catch below
+    } catch (e) {
+      BROWSERS_EXE_PATH = null;
+    }
+  }
+} catch (e) {
+  // pacote não disponível — tudo bem, fallback será tratado em runtime
+  BROWSERS_EXE_PATH = null;
+}
+
 /* === Internals === */
 const app = express();
 app.use(express.json({ limit: '2mb' }));
@@ -111,7 +129,7 @@ class Worker {
       this.browser = null;
     }
 
-    const launchOptions = {
+    const baseLaunchOptions = {
       headless: true,
       args: [
         '--no-sandbox',
@@ -125,18 +143,44 @@ class Worker {
       ],
       defaultViewport: { width: 1200, height: 800 }
     };
-    if (PUPPETEER_EXECUTABLE_PATH) {
-      launchOptions.executablePath = PUPPETEER_EXECUTABLE_PATH;
-      this.log('Usando PUPPETEER_EXECUTABLE_PATH:', PUPPETEER_EXECUTABLE_PATH);
+
+    // decide qual executablePath usar (env tem prioridade, senão o @puppeteer/browsers)
+    const exeToUse = PUPPETEER_EXECUTABLE_PATH || BROWSERS_EXE_PATH || null;
+    const launchOptions = { ...baseLaunchOptions };
+
+    if (exeToUse) {
+      launchOptions.executablePath = exeToUse;
+      this.log('Tentando Chromium em (executablePath):', exeToUse);
     } else {
-      this.log('Nenhum PUPPETEER_EXECUTABLE_PATH — puppeteer usará Chromium em node_modules');
+      this.log('Nenhum PUPPETEER_EXECUTABLE_PATH nem chrome instalado via @puppeteer/browsers detectado — deixando puppeteer escolher.');
     }
 
-    this.browser = await puppeteer.launch(launchOptions);
-    this.browserLastUsed = Date.now();
-    this.log('Chromium iniciado');
-    this.scheduleIdleClose();
-    return this.browser;
+    // Tenta iniciar com o que definimos; se falhar e definimos executablePath, tenta fallback sem executablePath
+    try {
+      this.browser = await puppeteer.launch(launchOptions);
+      this.browserLastUsed = Date.now();
+      this.log('Chromium iniciado (com opções).');
+      this.scheduleIdleClose();
+      return this.browser;
+    } catch (err) {
+      this.log('Falha ao iniciar Chromium com executablePath (se fornecido):', err && (err.message || err.stack || err));
+      if (launchOptions.executablePath) {
+        try {
+          this.log('Tentando fallback: iniciar puppeteer sem executablePath (usa o binário padrão do puppeteer).');
+          const fallbackOpts = { ...baseLaunchOptions };
+          this.browser = await puppeteer.launch(fallbackOpts);
+          this.browserLastUsed = Date.now();
+          this.log('Chromium iniciado (fallback sem executablePath).');
+          this.scheduleIdleClose();
+          return this.browser;
+        } catch (err2) {
+          this.log('Falha no fallback ao iniciar Chromium:', err2 && (err2.message || err2.stack || err2));
+          throw err2;
+        }
+      }
+      // se não havia executablePath e já falhou, propaga
+      throw err;
+    }
   }
 
   scheduleIdleClose() {

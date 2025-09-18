@@ -28,8 +28,8 @@ const POST_URL = process.env.POST_URL || TARGET;
 const CONCURRENCY = Math.max(1, parseInt(process.env.CONCURRENCY || '2', 10)); // default 2
 const COOKIE_TTL = parseInt(process.env.COOKIE_TTL || String(2 * 60 * 1000), 10); // 2 min
 const BROWSER_IDLE_TIMEOUT = parseInt(process.env.BROWSER_IDLE_TIMEOUT || String(60 * 1000), 10); // 1 min
-const SYNC_RESPONSE = (process.env.SYNC_RESPONSE || 'false').toLowerCase() === 'true'; // default keep sync
-const ASYNC_RESPONSE = (process.env.ASYNC_RESPONSE || 'true').toLowerCase() === 'true';
+const SYNC_RESPONSE = (process.env.SYNC_RESPONSE || 'true').toLowerCase() === 'true'; // default keep sync
+const ASYNC_RESPONSE = (process.env.ASYNC_RESPONSE || 'false').toLowerCase() === 'true';
 const DEBUG_DUMP = (process.env.DEBUG_DUMP || 'false').toLowerCase() === 'true';
 const PUPPETEER_EXECUTABLE_PATH = process.env.PUPPETEER_EXECUTABLE_PATH || null;
 

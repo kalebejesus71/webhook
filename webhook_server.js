@@ -12,6 +12,7 @@
 // SYNC_RESPONSE - "true" para manter o comportamento síncrono (default "true")
 // ASYNC_RESPONSE - alternativa (se true, responderá 200 e processa em background)
 // DEBUG_DUMP - "true" para salvar debug_page_<ts>.html quando não achar cookie
+// PUPPETEER_EXECUTABLE_PATH - (opcional) caminho para o binário do Chrome/Chromium a usar
 
 const express = require('express');
 const puppeteer = require('puppeteer-extra');
@@ -33,23 +34,13 @@ const ASYNC_RESPONSE = (process.env.ASYNC_RESPONSE || 'false').toLowerCase() ===
 const DEBUG_DUMP = (process.env.DEBUG_DUMP || 'false').toLowerCase() === 'true';
 const PUPPETEER_EXECUTABLE_PATH = process.env.PUPPETEER_EXECUTABLE_PATH || null;
 
-/* === Determine default chrome path installed by @puppeteer/browsers (if available) === */
-let BROWSERS_EXE_PATH = null;
-try {
-  // @puppeteer/browsers exports executablePath(...)
-  const browsersPkg = require('@puppeteer/browsers');
-  if (browsersPkg && typeof browsersPkg.executablePath === 'function') {
-    try {
-      BROWSERS_EXE_PATH = browsersPkg.executablePath('chrome');
-      // may throw if not installed; catch below
-    } catch (e) {
-      BROWSERS_EXE_PATH = null;
-    }
-  }
-} catch (e) {
-  // pacote não disponível — tudo bem, fallback será tratado em runtime
-  BROWSERS_EXE_PATH = null;
-}
+/* NOTE
+   Mudança importante: removi a tentativa automática de detectar
+   @puppeteer/browsers para evitar exigir uma revisão específica (ex: 127).
+   Agora o comportamento é simples:
+     1) usa PUPPETEER_EXECUTABLE_PATH se definido (env var)
+     2) senão deixa o puppeteer usar o binário que ele gerencia por padrão
+*/
 
 /* === Internals === */
 const app = express();
@@ -144,15 +135,15 @@ class Worker {
       defaultViewport: { width: 1200, height: 800 }
     };
 
-    // decide qual executablePath usar (env tem prioridade, senão o @puppeteer/browsers)
-    const exeToUse = PUPPETEER_EXECUTABLE_PATH || BROWSERS_EXE_PATH || null;
+    // Agora usamos SÓ o PUPPETEER_EXECUTABLE_PATH (se definido) — removi a detecção de @puppeteer/browsers
+    const exeToUse = PUPPETEER_EXECUTABLE_PATH || null;
     const launchOptions = { ...baseLaunchOptions };
 
     if (exeToUse) {
       launchOptions.executablePath = exeToUse;
       this.log('Tentando Chromium em (executablePath):', exeToUse);
     } else {
-      this.log('Nenhum PUPPETEER_EXECUTABLE_PATH nem chrome instalado via @puppeteer/browsers detectado — deixando puppeteer escolher.');
+      this.log('Nenhum PUPPETEER_EXECUTABLE_PATH definido — deixando puppeteer usar seu binário padrão.');
     }
 
     // Tenta iniciar com o que definimos; se falhar e definimos executablePath, tenta fallback sem executablePath

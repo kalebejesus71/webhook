@@ -10,7 +10,7 @@
 // COOKIE_TTL - ms para cache do __test cookie (default 120000 = 2min)
 // BROWSER_IDLE_TIMEOUT - ms para fechar browser ocioso (default 60000 = 1min)
 // SYNC_RESPONSE - "true" para manter o comportamento síncrono (default "true")
-// ASYNC_RESPONSE - alternativa (se true, responderá 202 e processa em background)
+// ASYNC_RESPONSE - alternativa (se true, responderá 200 e processa em background)
 // DEBUG_DUMP - "true" para salvar debug_page_<ts>.html quando não achar cookie
 
 const express = require('express');
@@ -28,8 +28,8 @@ const POST_URL = process.env.POST_URL || TARGET;
 const CONCURRENCY = Math.max(1, parseInt(process.env.CONCURRENCY || '2', 10)); // default 2
 const COOKIE_TTL = parseInt(process.env.COOKIE_TTL || String(2 * 60 * 1000), 10); // 2 min
 const BROWSER_IDLE_TIMEOUT = parseInt(process.env.BROWSER_IDLE_TIMEOUT || String(60 * 1000), 10); // 1 min
-const SYNC_RESPONSE = (process.env.SYNC_RESPONSE || 'true').toLowerCase() === 'true'; // default keep sync
-const ASYNC_RESPONSE = (process.env.ASYNC_RESPONSE || 'false').toLowerCase() === 'true';
+const SYNC_RESPONSE = (process.env.SYNC_RESPONSE || 'false').toLowerCase() === 'true'; // default keep sync
+const ASYNC_RESPONSE = (process.env.ASYNC_RESPONSE || 'true').toLowerCase() === 'true';
 const DEBUG_DUMP = (process.env.DEBUG_DUMP || 'false').toLowerCase() === 'true';
 const PUPPETEER_EXECUTABLE_PATH = process.env.PUPPETEER_EXECUTABLE_PATH || null;
 
@@ -308,17 +308,17 @@ for (let i = 0; i < CONCURRENCY; i++) {
 
 // Mantive a rota e o comportamento original.
 // Por padrão (SYNC_RESPONSE=true) o endpoint espera o processamento e retorna o status do POST_URL.
-// Se quiser comportamento async/resposta rápida, set ASYNC_RESPONSE=true (então responde 202 imediatamente).
+// Se quiser comportamento async/resposta rápida, set ASYNC_RESPONSE=true (então responde 200 imediatamente).
 app.post('/proxy-webhook', async (req, res) => {
   const incomingPayload = req.body;
   console.log('Recebido webhook — payload (preview):', JSON.stringify(incomingPayload).slice(0, 1000));
 
   // enfileira e aguarda o resultado (ou não, se ASYNC)
   if (ASYNC_RESPONSE) {
-    // modo background — não bloqueia e responde 202
+    // modo background — não bloqueia e responde 200
     enqueueTask(incomingPayload)
       .catch(err => console.error('Erro processando task em background:', err && (err.stack || err.message || err)));
-    res.status(202).json({ queued: true });
+    res.status(200).json({ queued: true });
     return;
   }
 

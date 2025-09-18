@@ -3,8 +3,7 @@
   "version": "1.0.0",
   "main": "webhook_server.js",
   "scripts": {
-    "start": "node webhook_server.js",
-    "postinstall": "npx @puppeteer/browsers install chrome:127.0.6533.88"
+    "start": "node webhook_server.js"
   },
   "dependencies": {
     "express": "^5.1.0",
